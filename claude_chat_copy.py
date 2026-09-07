@@ -267,6 +267,8 @@ def apply_copy(plan, idle_check=ensure_idle):
                 if destination.exists():
                     raise ValueError("Destination collision. Nothing was replaced.")
             made_dirs = []
+            receipt_path = None
+            receipt_created = False
             try:
                 # Metadata is committed last, after all transcript files exist.
                 for staged_file, destination in staged:
@@ -289,10 +291,13 @@ def apply_copy(plan, idle_check=ensure_idle):
                            "files": {str(path): digest(path) for path in created}}
                 receipt_path = receipt_dir / (str(uuid.uuid4()) + ".json")
                 with receipt_path.open("x") as stream:
+                    receipt_created = True
                     os.chmod(receipt_path, 0o600)
                     json.dump(receipt, stream, indent=2)
                 return receipt_path
             except BaseException:
+                if receipt_created:
+                    receipt_path.unlink(missing_ok=True)
                 for path in reversed(created):
                     path.unlink(missing_ok=True)
                 for directory in reversed(made_dirs):

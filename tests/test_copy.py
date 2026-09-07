@@ -208,6 +208,15 @@ class CopyTests(unittest.TestCase):
         receipt = tool.read_json(tool.apply_copy(self.plan(), idle_check=lambda: None))
         self.assertEqual(len(receipt["sessions"]), 2)
 
+    def test_receipt_failure_rolls_back_cleanly(self):
+        plan = self.plan()
+        with patch.object(tool.json, "dump", side_effect=OSError("receipt disk full")):
+            with self.assertRaisesRegex(OSError, "receipt disk full"):
+                tool.apply_copy(plan, idle_check=lambda: None)
+        self.assertEqual(len(tool.read_sessions(self.target)), 1)
+        self.assertEqual(list((self.target / ".chat-copy-receipts").glob("*.json")), [])
+        self.plan()  # A partial receipt must not block a retry.
+
 
 if __name__ == "__main__":
     unittest.main()
